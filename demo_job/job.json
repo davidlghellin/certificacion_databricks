@@ -1,0 +1,103 @@
+{
+  "name": "demo-diamante-saludo",
+  "max_concurrent_runs": 1,
+  "queue": {
+    "enabled": true
+  },
+  "tasks": [
+    {
+      "task_key": "inicio",
+      "notebook_task": {
+        "notebook_path": "/00_inicio",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "obtener_hora",
+      "depends_on": [
+        {
+          "task_key": "inicio"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/10_hora",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "obtener_usuario",
+      "depends_on": [
+        {
+          "task_key": "inicio"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/11_usuario",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "validar_user",
+      "depends_on": [
+        {
+          "task_key": "obtener_usuario"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/21_user_fail",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "obtener_fecha",
+      "notebook_task": {
+        "notebook_path": "/12_fecha",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "crear_datos",
+      "depends_on": [
+        {
+          "task_key": "inicio"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/30_crear_datos",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "validar_datos",
+      "depends_on": [
+        {
+          "task_key": "crear_datos"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/31_validar_datos",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "saludo",
+      "depends_on": [
+        {
+          "task_key": "obtener_hora"
+        },
+        {
+          "task_key": "obtener_fecha"
+        },
+        {
+          "task_key": "obtener_usuario"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/20_saludo",
+        "source": "WORKSPACE"
+      }
+    }
+  ]
+}
