@@ -1,2 +1,4 @@
 .venv
 .direnv
+.DS_Store
+apuntes-databricks

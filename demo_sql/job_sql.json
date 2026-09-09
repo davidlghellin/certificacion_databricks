@@ -1,0 +1,69 @@
+{
+    "name": "demo-sql-merge",
+    "max_concurrent_runs": 1,
+    "parameters": [
+        {
+            "name": "esquema",
+            "default": "main.demo_merge"
+        },
+        {
+            "name": "tabla",
+            "default": "main.demo_merge.clientes"
+        },
+        {
+            "name": "ciudad_nueva",
+            "default": "Barcelona"
+        }
+    ],
+    "tasks": [
+        {
+            "task_key": "init_clientes",
+            "sql_task": {
+                "warehouse_id": "1d7c41d2696dccba",
+                "file": {
+                    "path": "/00_merge.sql",
+                    "source": "WORKSPACE"
+                },
+                "parameters": {
+                    "esquema": "main.demo_merge",
+                    "tabla": "main.demo_merge.clientes",
+                    "ciudad_nueva": "Barcelona"
+                }
+            }
+        },
+        {
+            "task_key": "merge_into",
+            "depends_on": [
+                {
+                    "task_key": "init_clientes"
+                }
+            ],
+            "run_if": "ALL_SUCCESS",
+            "sql_task": {
+                "warehouse_id": "1d7c41d2696dccba",
+                "file": {
+                    "path": "/01_merge_into.sql",
+                    "source": "WORKSPACE"
+                },
+                "parameters": {
+                    "esquema": "main.demo_merge",
+                    "tabla": "main.demo_merge.clientes",
+                    "ciudad_nueva": "Barcelona"
+                }
+            }
+        },
+        {
+            "task_key": "saludo",
+            "depends_on": [
+                {
+                    "task_key": "merge_into"
+                }
+            ],
+            "run_if": "ALL_SUCCESS",
+            "notebook_task": {
+                "notebook_path": "/00_saludo",
+                "source": "WORKSPACE"
+            }
+        }
+    ]
+}
