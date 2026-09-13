@@ -13,7 +13,9 @@ demo_delta/
 ```
 
 Los dos jobs son **independientes** y escriben en esquemas distintos, así que
-puedes lanzarlos a la vez sin que se pisen.
+los datos no se pisan. Dentro de cada job las tasks sí corren en paralelo
+(verificado). Lanzar **los dos jobs a la vez** no está probado: si ves
+`RESOURCE_EXHAUSTED`, espera a que acabe uno.
 
 ## El temario
 
@@ -103,13 +105,14 @@ Los notebooks asumen el catálogo `main`. En Free Edition suele llamarse
 `workspace`. Cámbialo en la primera celda de cada uno, o de una pasada:
 
 ```sh
-sed -i '' 's/"main"/"workspace"/'    python/*.py
-sed -i '' 's/USE CATALOG main/USE CATALOG workspace/' sql/*.sql
+# -i.bak funciona con el sed de macOS y con el de GNU/Linux
+sed -i.bak 's/"main"/"workspace"/'    python/*.py && rm python/*.bak
+sed -i.bak 's/USE CATALOG main/USE CATALOG workspace/' sql/*.sql && rm sql/*.bak
 ```
 
 ## Lo que NO está aquí
 
-- **Ingesta** (`COPY INTO`, Auto Loader, `read_files`) → [Readme raíz](../Readme.md)
+- **Ingesta** (`COPY INTO`, Auto Loader, `read_files`) → [01-ingesta](../01-ingesta/README.md)
 - **Structured Streaming** sobre Delta → apéndice B de los apuntes
 - **`AUTO CDC INTO`** y Declarative Pipelines → apéndices J y K
 - **Unity Catalog** (permisos, volumes, views) → apéndice G

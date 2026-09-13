@@ -19,9 +19,14 @@ TABLA = f"{CATALOGO}.{ESQUEMA}.inventario"
 
 # COMMAND ----------
 
+# Se borra antes de crear: `mode("overwrite")` sobre una tabla existente NO
+# reinicia el historial, añade una versión más. En la segunda ejecución los
+# `versionAsOf` fijos de abajo apuntarían a la ejecución anterior.
+spark.sql(f"DROP TABLE IF EXISTS {TABLA}")
+
 # v0: crear
 spark.createDataFrame([("A", 10), ("B", 20)], "sku STRING, stock INT") \
-    .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(TABLA)
+    .write.saveAsTable(TABLA)
 
 dt = DeltaTable.forName(spark, TABLA)
 dt.update("sku = 'A'", {"stock": "5"})                                    # v1

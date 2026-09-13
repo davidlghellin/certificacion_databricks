@@ -10,7 +10,12 @@
 USE CATALOG main;
 USE SCHEMA demo_delta;
 
-CREATE OR REPLACE TABLE inventario (sku STRING, stock INT);   -- v0
+-- DROP + CREATE, y NO `CREATE OR REPLACE`: este último CONSERVA el historial.
+-- En una segunda ejecución la tabla ya tendría versiones 0..4 de la anterior, y
+-- los `VERSION AS OF 1/2/3` de abajo apuntarían a datos viejos. Borrarla primero
+-- garantiza que la numeración de versiones empieza de cero en cada ejecución.
+DROP TABLE IF EXISTS inventario;
+CREATE TABLE inventario (sku STRING, stock INT);              -- v0
 INSERT INTO inventario VALUES ('A', 10), ('B', 20);           -- v1
 UPDATE inventario SET stock = 5 WHERE sku = 'A';              -- v2
 DELETE FROM inventario WHERE sku = 'B';                       -- v3

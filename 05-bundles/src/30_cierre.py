@@ -18,11 +18,18 @@ def leer(task, clave, por_defecto=None):
 tabla = dbutils.widgets.get("tabla")
 veredicto = leer("muchos", "veredicto") or leer("pocos", "veredicto") or "?"
 
+# Esta task corre con `run_if: ALL_DONE`, o sea también cuando `preparar` falló y
+# la tabla ni existe. Si el conteo reventara, taparía el error original.
+try:
+    filas = spark.table(tabla).count()
+except Exception as e:
+    filas = f"no disponible ({type(e).__name__})"
+
 resumen = {
     "run_id": dbutils.widgets.get("run_id"),
     "tabla": tabla,
     "veredicto": veredicto,
-    "filas": spark.table(tabla).count(),
+    "filas": filas,
 }
 
 print(json.dumps(resumen, indent=2, ensure_ascii=False))

@@ -64,15 +64,28 @@ def silver_pedidos():
     comment="Las filas que silver_pedidos descarta, para poder investigarlas",
 )
 def silver_pedidos_cuarentena():
+    # La condición tiene que ser el COMPLEMENTO EXACTO de `REGLAS_DESCARTE`,
+    # evaluada sobre los MISMOS valores que ve silver: ya tipados. Un
+    # `cliente_id = 'abc'` no es NULL en crudo, pero sí tras el cast, y silver lo
+    # descarta; mirando el crudo, esa fila no aparecería en ningún sitio.
+    cliente_tipado = col("cliente_id").cast("int")
+    ts_tipado = col("ts").cast("timestamp")
     return (
         spark.readStream.table("bronze_pedidos")
-        .where("cliente_id IS NULL OR ts IS NULL")
+        .select(
+            "*",
+            cliente_tipado.alias("_cliente_id_tipado"),
+            ts_tipado.alias("_ts_tipado"),
+        )
+        # NOT (cliente_presente) OR NOT (fecha_razonable)
+        .where("_cliente_id_tipado IS NULL "
+               "OR NOT (_ts_tipado IS NOT NULL AND _ts_tipado > '2026-01-01')")
         # Etiquetar POR QUÉ falló cada fila es lo que hace útil la cuarentena
         .select(
             "*",
-            when(col("cliente_id").isNull(), "sin_cliente")
-            .when(col("ts").isNull(), "sin_fecha")
-            .otherwise("otro")
+            when(col("_cliente_id_tipado").isNull(), "sin_cliente")
+            .when(col("_ts_tipado").isNull(), "sin_fecha")
+            .otherwise("fecha_anterior_a_2026")
             .alias("motivo_rechazo"),
         )
     )

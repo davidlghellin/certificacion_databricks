@@ -193,11 +193,14 @@ display(dt.history().where(col("operation") == "DELETE").select("version", "oper
 
 # COMMAND ----------
 
-# DRY RUN primero, siempre: enseña qué borraría sin borrar
-display(dt.vacuum(retentionHours=168))   # sin dryRun, DeltaTable.vacuum ya ejecuta
-
-# Equivalente SQL con dry run explícito:
+# DRY RUN primero, siempre: enseña qué borraría SIN borrar nada.
+# Solo existe en SQL: `DeltaTable.vacuum()` no tiene modo simulación.
 display(spark.sql(f"VACUUM {TABLA} RETAIN 168 HOURS DRY RUN"))
+
+# COMMAND ----------
+
+# Y ahora sí, el borrado real. Ojo: `DeltaTable.vacuum` EJECUTA directamente.
+display(dt.vacuum(retentionHours=168))
 
 # COMMAND ----------
 

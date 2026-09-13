@@ -1,12 +1,12 @@
-# demo_yml — el mismo job, pero como Asset Bundle (DAB)
+# 05-bundles — el mismo job, pero como Asset Bundle (DAB)
 
-Igual que [demo_task_advanced](../demo_task_advanced/) pero en YAML dentro de un
+Igual que [03-jobs-avanzado](../03-jobs-avanzado/) pero en YAML dentro de un
 **Databricks Asset Bundle**. Es la forma que pide el examen en la parte de
 DevOps/CI-CD: el job, los notebooks y la config por entorno viven en el repo y
 se despliegan con un comando.
 
 ```
-demo_yml/
+05-bundles/
 ├── databricks.yml                  ← raiz del bundle: nombre, variables, targets
 ├── resources/
 │   └── demo_yml.job.yml            ← el job
@@ -58,12 +58,12 @@ ejecución sin redesplegar.
 
 ## Usarlo
 
-Edita el `host` de los dos targets en [databricks.yml](databricks.yml) y:
+El `host` no va en el YAML: se toma de tu perfil del CLI.
 
 ```sh
 databricks auth login --host https://<tu-workspace>.cloud.databricks.com
 
-cd demo_yml
+cd 05-bundles
 
 databricks bundle validate                 # comprueba el YAML y resuelve ${...}
 databricks bundle validate -t pro          # lo mismo para el otro target

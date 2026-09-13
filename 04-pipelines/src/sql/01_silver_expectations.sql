@@ -62,6 +62,12 @@ FROM STREAM bronze_pedidos;
 -- `DROP ROW` descarta y no deja rastro de la fila. Si necesitas auditarlas o
 -- reprocesarlas, el patrón es invertir la condición en una tabla paralela.
 -- Fíjate en que aquí NO hay expectations: queremos exactamente lo contrario.
+--
+-- LA CONDICIÓN TIENE QUE SER EL COMPLEMENTO EXACTO de las reglas `DROP ROW` de
+-- silver, evaluadas sobre los MISMOS valores. Silver valida DESPUÉS de castear,
+-- así que aquí también se castea: un `cliente_id = 'abc'` no es NULL en crudo,
+-- pero sí tras `CAST(... AS INT)`, y silver lo descarta. Si la cuarentena mirara
+-- el valor crudo, esa fila desaparecería sin dejar rastro en ningún sitio.
 
 CREATE OR REFRESH STREAMING TABLE silver_pedidos_cuarentena
 COMMENT 'Las filas que silver_pedidos descarta, para poder investigarlas'
@@ -70,9 +76,17 @@ SELECT
   *,
   -- Etiquetar POR QUÉ falló cada fila es lo que hace útil la cuarentena
   CASE
-    WHEN cliente_id IS NULL THEN 'sin_cliente'
-    WHEN ts IS NULL         THEN 'sin_fecha'
-    ELSE 'otro'
+    WHEN _cliente_id_tipado IS NULL   THEN 'sin_cliente'
+    WHEN _ts_tipado IS NULL           THEN 'sin_fecha'
+    ELSE 'fecha_anterior_a_2026'
   END AS motivo_rechazo
-FROM STREAM bronze_pedidos
-WHERE cliente_id IS NULL OR ts IS NULL;
+FROM (
+  SELECT
+    *,
+    CAST(cliente_id AS INT)  AS _cliente_id_tipado,
+    CAST(ts AS TIMESTAMP)    AS _ts_tipado
+  FROM STREAM bronze_pedidos
+)
+-- NOT (cliente_presente) OR NOT (fecha_razonable)
+WHERE _cliente_id_tipado IS NULL
+   OR NOT (_ts_tipado IS NOT NULL AND _ts_tipado > '2026-01-01');

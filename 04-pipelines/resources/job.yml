@@ -28,8 +28,12 @@ resources:
           default: "1"
         - name: filas_toxicas
           default: "no"
-        - name: reiniciar
-          default: "no"
+        # No hay parámetro `reiniciar` a propósito. Borrar la landing exige un
+        # FULL REFRESH de los pipelines, porque su checkpoint recuerda los
+        # ficheros ya leídos; y `full_refresh` es un booleano fijo de la task,
+        # no se puede atar a un parámetro de ejecución. Para empezar de cero:
+        #   databricks bundle run demo_pipeline_sql --full-refresh-all
+        #   databricks bundle run demo_pipeline_python --full-refresh-all
 
       tasks:
         # --- 1. Fabricar los ficheros de entrada -------------------------
@@ -42,7 +46,6 @@ resources:
               esquema_landing: ${var.esquema_landing}
               lote: "{{job.parameters.lote}}"
               filas_toxicas: "{{job.parameters.filas_toxicas}}"
-              reiniciar: "{{job.parameters.reiniciar}}"
 
         # --- 2. Los dos pipelines, EN SERIE ------------------------------
         # Lo natural sería ponerlos en paralelo (no dependen entre sí), pero

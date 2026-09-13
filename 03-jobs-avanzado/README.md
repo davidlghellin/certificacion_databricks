@@ -152,7 +152,7 @@ databricks jobs delete $JOB_ID
 }
 ```
 
-**Llamar a otro job como task** (`run_job_task`), p. ej. al de `demo_job/`:
+**Llamar a otro job como task** (`run_job_task`), p. ej. al de `03-jobs-basico/`:
 
 ```json
 {
@@ -178,4 +178,4 @@ databricks jobs delete $JOB_ID
 }
 ```
 
-**Task SQL** sobre un warehouse: ver [demo_sql](../demo_sql/).
+**Task SQL** sobre un warehouse: ver [03-jobs-sql](../03-jobs-sql/).
