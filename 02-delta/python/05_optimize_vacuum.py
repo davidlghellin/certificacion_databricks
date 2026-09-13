@@ -219,12 +219,20 @@ vacuum_cero_hecho = False
 try:
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     dt.vacuum(retentionHours=0)
-    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
     vacuum_cero_hecho = True
     print("VACUUM con retención 0 ejecutado")
 except Exception as e:
     print("No se ha podido forzar retención 0 (normal en serverless):")
     print(str(e)[:250])
+finally:
+    # Restaurar SIEMPRE el valor seguro, también si el VACUUM falló a medias. Si
+    # se quedara en "false", el resto de la sesión permitiría retenciones que
+    # pueden romper streams y lectores. En serverless este set también está
+    # bloqueado, así que se tolera que falle.
+    try:
+        spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    except Exception:
+        pass
 
 # COMMAND ----------
 

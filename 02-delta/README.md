@@ -94,6 +94,7 @@ limpien al terminar:
 ```sh
 # Con --json, el job_id va DENTRO del JSON: no se puede pasar además como argumento
 databricks jobs run-now --json "{\"job_id\": $SQL_ID, \"job_parameters\": {\"limpiar_al_final\": \"si\"}}"
+databricks jobs run-now --json "{\"job_id\": $PY_ID,  \"job_parameters\": {\"limpiar_al_final\": \"si\"}}"
 ```
 
 La tarea `limpiar` cuelga de un `condition_task` con `run_if: ALL_SUCCESS`, así

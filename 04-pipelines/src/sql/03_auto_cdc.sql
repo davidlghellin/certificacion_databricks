@@ -24,7 +24,7 @@
 --     SEQUENCE BY <col | (c1, c2)>          <- OBLIGATORIO
 --     [ COLUMNS { * EXCEPT (...) | (...) } ]
 --     [ STORED AS { SCD TYPE 1 | SCD TYPE 2 } ]   <- por defecto TYPE 1
---     [ TRACK HISTORY ON { * EXCEPT (...) | (...) } ]  <- solo SCD TYPE 2
+--     [ TRACK HISTORY ON { col [, ...] | * EXCEPT (col [, ...]) } ]  <- solo SCD TYPE 2
 
 
 -- ---------------------------------------------------------------------------

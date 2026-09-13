@@ -165,8 +165,12 @@ databricks jobs run-now --json "{
 ```
 
 Para ver el camino de fallo entero, pon `"prob_fallo": "1"`: `inestable` gasta
-sus 2 reintentos, se marca FAILED, y se disparan `limpieza`, `alerta_fallo` y
-`todo_fallo`.
+sus 2 reintentos y se marca FAILED. Se ejecutan `limpieza` y `alerta_fallo`, y
+`todo_fallo` queda **EXCLUDED a propósito**: depende también de `parametros`, que
+siempre sale bien, así que `ALL_FAILED` no se cumple nunca. Es un ejemplo de
+exclusión, para ver el contraste con `AT_LEAST_ONE_FAILED`; `ALL_FAILED` solo se
+ejecutaría si fallaran **todas** sus dependencias. Verificado: el job termina en
+`SUCCESS_WITH_FAILURES` con exactamente ese reparto.
 
 Borrar:
 

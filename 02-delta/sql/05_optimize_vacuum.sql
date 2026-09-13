@@ -219,11 +219,19 @@ VACUUM metricas;        -- retención por defecto: 7 días
 -- MAGIC try:
 -- MAGIC     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
 -- MAGIC     spark.sql("VACUUM metricas RETAIN 0 HOURS")
--- MAGIC     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
 -- MAGIC     print("VACUUM con retención 0 ejecutado: el time travel antiguo ya no existe")
 -- MAGIC except Exception as e:
 -- MAGIC     print("No se ha podido forzar retención 0 (normal en serverless):")
 -- MAGIC     print(str(e)[:250])
+-- MAGIC finally:
+-- MAGIC     # Restaurar SIEMPRE el valor seguro, también si el VACUUM falló a medias. Si
+-- MAGIC     # se quedara en "false", el resto de la sesión permitiría retenciones que
+-- MAGIC     # pueden romper streams y lectores. En serverless este set también está
+-- MAGIC     # bloqueado, así que se tolera que falle.
+-- MAGIC     try:
+-- MAGIC         spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+-- MAGIC     except Exception:
+-- MAGIC         pass
 
 -- COMMAND ----------
 
