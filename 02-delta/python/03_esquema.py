@@ -101,13 +101,14 @@ display(spark.table("productos").orderBy("id"))
 
 # COMMAND ----------
 
-nuevo = spark.table("productos").select(
-    col("id"),
-    col("nombre"),
-    col("precio").cast("decimal(10,2)").alias("precio"),
-    col("color"),
-    col("pais"),
-)
+origen = spark.table("productos")
+# Solo cambia el tipo de `precio`; el resto de columnas pasan tal cual. Se construye
+# desde `origen.columns` para no perder ninguna si la tabla tiene más de las que
+# esperamos (por ejemplo, si una celda anterior de evolución de esquema añadió otra).
+nuevo = origen.select([
+    col(c).cast("decimal(10,2)").alias(c) if c == "precio" else col(c)
+    for c in origen.columns
+])
 
 (nuevo.write
     .mode("overwrite")

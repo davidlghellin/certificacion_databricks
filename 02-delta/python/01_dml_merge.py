@@ -161,12 +161,9 @@ sucio = spark.createDataFrame(
 
 w = Window.partitionBy("id").orderBy(col("ts").desc())
 limpio = (
-    sucio.select(
-        col("id"), col("nombre"), col("ciudad"), col("ts"),
-        row_number().over(w).alias("rn"),
-    )
+    sucio.select("*", row_number().over(w).alias("rn"))
     .where("rn = 1")
-    .select("id", "nombre", "ciudad")
+    .select(sucio.columns)          # todas las originales; solo se va `rn`
 )
 
 display(limpio)

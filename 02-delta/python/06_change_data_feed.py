@@ -119,13 +119,9 @@ w = Window.partitionBy("id").orderBy(col("_commit_version").desc())
 
 neto = (
     cdf.where(col("_change_type") != "update_preimage")
-    .select(
-        col("id"), col("titular"), col("saldo"),
-        col("_change_type"), col("_commit_version"),
-        row_number().over(w).alias("rn"),
-    )
+    .select("*", row_number().over(w).alias("rn"))
     .where("rn = 1")
-    .select("id", "titular", "saldo", "_change_type", "_commit_version")
+    .select(cdf.columns)            # todas las del feed, incluido _commit_timestamp
 )
 
 display(neto.orderBy("id"))

@@ -6,6 +6,11 @@
 #   spark.readStream.table(...)  -> STREAMING TABLE
 #   spark.read.table(...)        -> MATERIALIZED VIEW
 #
+# VERIFICADO en Unity Catalog tras desplegar: las tres tablas de este fichero
+# quedan con `table_type = MATERIALIZED_VIEW`, igual que sus gemelas SQL, y
+# `silver_pedidos` (que lee con readStream) queda como STREAMING_TABLE.
+# `databricks tables get main.<esquema>.gold_ventas_por_pais` para comprobarlo.
+#
 # Aquí toca `spark.read` porque una agregación modifica filas que ya existían:
 # si llega un pedido nuevo de España, la fila "ES" del resultado se actualiza,
 # no se añade. Una streaming table solo sabe añadir.

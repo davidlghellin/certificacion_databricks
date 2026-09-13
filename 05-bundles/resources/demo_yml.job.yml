@@ -68,7 +68,14 @@ resources:
             - task_key: preparar
           for_each_task:
             inputs: "{{tasks.preparar.values.lista}}"
-            concurrency: 2
+            # 1, no 2: cada iteración hace un MERGE sobre la MISMA tabla, que no
+            # está particionada. Dos MERGE a la vez leen el mismo snapshot y el
+            # segundo en confirmar puede morir con ConcurrentAppendException:
+            # es la concurrencia optimista de Delta (apuntes, §D.2 y demo 02-delta/08).
+            # Que el MERGE sea idempotente evita duplicados al reintentar, pero
+            # NO evita el conflicto. Para paralelizar de verdad habría que
+            # escribir cada item por separado y consolidar en un solo paso.
+            concurrency: 1
             task:
               task_key: cargar_item
               notebook_task:

@@ -67,8 +67,10 @@ SELECT 'origen', count(*) FROM origen;
 -- MAGIC %md
 -- MAGIC ## DEEP CLONE
 -- MAGIC
--- MAGIC Copia completa e independiente, con todo el historial. Es la opción para
--- MAGIC backups o para mover una tabla a otro catálogo/región.
+-- MAGIC Copia completa e independiente del **estado actual**: datos y metadatos. Es la
+-- MAGIC opción para backups o para mover una tabla a otro catálogo/región.
+-- MAGIC
+-- MAGIC Ojo: **no copia el historial**. El clon arranca uno nuevo (versión 0 = `CLONE`).
 
 -- COMMAND ----------
 
@@ -139,8 +141,14 @@ CREATE TABLE IF NOT EXISTS origen_deep DEEP CLONE origen;   -- no-op
 -- MAGIC %md
 -- MAGIC ## Qué se lleva el clon y qué no
 -- MAGIC
--- MAGIC **Sí**: esquema, particionado/clustering, propiedades (`TBLPROPERTIES`),
--- MAGIC constraints, comentarios y el historial.
+-- MAGIC **Sí**: los datos del estado actual, esquema, particionado/clustering,
+-- MAGIC propiedades (`TBLPROPERTIES`), constraints y comentarios.
 -- MAGIC
--- MAGIC **No**: los permisos de Unity Catalog. El clon es un objeto nuevo y los `GRANT`
--- MAGIC hay que rehacerlos.
+-- MAGIC **No**:
+-- MAGIC - **El historial del origen.** El clon empieza el suyo propio, con una única
+-- MAGIC   versión 0 cuya operación es `CLONE`. Viajar en el clon a una versión antigua
+-- MAGIC   del origen falla (verificado):
+-- MAGIC   `DELTA_VERSION_NOT_FOUND: Cannot time travel Delta table to version 1. Available versions: [0, 0]`.
+-- MAGIC   Si necesitas una foto del pasado, clona **esa versión**: `DEEP CLONE t VERSION AS OF 3`.
+-- MAGIC - Los permisos de Unity Catalog. El clon es un objeto nuevo y los `GRANT`
+-- MAGIC   hay que rehacerlos.

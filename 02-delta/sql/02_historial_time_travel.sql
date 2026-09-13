@@ -74,7 +74,10 @@ SELECT * FROM inventario@v1;
 
 -- COMMAND ----------
 
--- Por timestamp: coge el de la v1 del historial
+-- Por timestamp: coge el de la v1 del historial.
+-- `TIMESTAMP AS OF` SÍ acepta aquí una subconsulta escalar (verificado en SQL
+-- warehouse y en compute serverless). No confundir con `table_changes()`, cuyos
+-- argumentos tienen que ser literales: ahí la subconsulta falla (notebook 06).
 SELECT * FROM inventario TIMESTAMP AS OF (
   SELECT timestamp FROM (DESCRIBE HISTORY inventario) WHERE version = 1
 );
