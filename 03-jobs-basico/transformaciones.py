@@ -3,7 +3,7 @@ from pyspark.sql.functions import col, upper
 
 
 def normalizar(df: DataFrame) -> DataFrame:
-    return df.withColumn("nombre", upper(col("nombre")))
+    return df.select(upper(col("nombre")).alias("nombre"), col("valor"))
 
 
 def contar_filas(df: DataFrame) -> int:

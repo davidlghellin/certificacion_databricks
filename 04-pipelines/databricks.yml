@@ -1,0 +1,59 @@
+# Bundle del demo de Declarative Pipelines.
+#
+# Este fichero cubre dos temas a la vez: es el DAB (Declarative Automation Bundle)
+# y a la vez despliega los pipelines. Un pipeline es un recurso más del bundle,
+# igual que un job.
+#
+# Por qué un bundle y no `databricks pipelines create --json`: un pipeline tiene
+# ficheros fuente (`libraries`) que hay que subir al workspace y mantener
+# sincronizados con la definición. El bundle hace las dos cosas de una vez.
+
+bundle:
+  name: demo_pipeline
+
+include:
+  - resources/*.yml
+
+variables:
+  catalogo:
+    description: Catalogo de Unity Catalog
+    default: main
+  esquema_landing:
+    description: Esquema donde vive el Volume con los ficheros de entrada
+    default: demo_pipeline
+  esquema_sql:
+    description: Esquema destino del pipeline SQL
+    default: demo_pipeline_sql
+  esquema_python:
+    description: Esquema destino del pipeline Python
+    default: demo_pipeline_py
+
+targets:
+  dev:
+    mode: development
+    default: true
+    # Sin `workspace.host` a propósito: el CLI lo coge de ~/.databrickscfg o de
+    # DATABRICKS_HOST. Así la URL del workspace no viaja en el repo, que es
+    # información de cliente y no aporta nada aquí.
+    #   databricks auth login --host https://<tu-workspace>.cloud.databricks.com
+    variables:
+      esquema_sql: demo_pipeline_sql_dev
+      esquema_python: demo_pipeline_py_dev
+    presets:
+      # `mode: development` pone los pipelines en modo desarrollo, que MANTIENE
+      # el compute vivo entre updates para iterar rápido. Aquí eso es un problema:
+      # la cuota de serverless de esta cuenta es de UN workload, así que el
+      # pipeline SQL con el compute caliente impide arrancar el de Python
+      # (RESOURCE_EXHAUSTED). Poniéndolo a false, cada update suelta su compute
+      # al terminar y el siguiente puede arrancar.
+      pipelines_development: false
+
+  pro:
+    mode: production
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+    presets:
+      trigger_pause_status: UNPAUSED

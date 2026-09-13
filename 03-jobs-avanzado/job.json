@@ -1,0 +1,272 @@
+{
+  "name": "demo-task-advanced",
+  "description": "Demo de parametros, valores dinamicos, condition_task, for_each_task y run_if",
+  "max_concurrent_runs": 1,
+  "timeout_seconds": 3600,
+  "queue": {
+    "enabled": true
+  },
+  "tags": {
+    "proyecto": "certificacion",
+    "tipo": "demo"
+  },
+  "schedule": {
+    "quartz_cron_expression": "0 0 7 * * ?",
+    "timezone_id": "Europe/Madrid",
+    "pause_status": "PAUSED"
+  },
+  "health": {
+    "rules": [
+      {
+        "metric": "RUN_DURATION_SECONDS",
+        "op": "GREATER_THAN",
+        "value": 900
+      }
+    ]
+  },
+  "parameters": [
+    {
+      "name": "entorno",
+      "default": "dev"
+    },
+    {
+      "name": "umbral",
+      "default": "50"
+    },
+    {
+      "name": "items",
+      "default": "alfa,beta,gamma"
+    },
+    {
+      "name": "modo",
+      "default": "rapido"
+    },
+    {
+      "name": "prob_fallo",
+      "default": "0.4"
+    }
+  ],
+  "tasks": [
+    {
+      "task_key": "parametros",
+      "description": "Lee parametros del job y valores dinamicos, publica taskValues",
+      "timeout_seconds": 600,
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/00_parametros",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "entorno": "{{job.parameters.entorno}}",
+          "umbral": "{{job.parameters.umbral}}",
+          "items": "{{job.parameters.items}}",
+          "modo": "{{job.parameters.modo}}",
+          "job_id": "{{job.id}}",
+          "run_id": "{{job.run_id}}",
+          "task_name": "{{task.name}}",
+          "fecha_run": "{{job.start_time.iso_date}}",
+          "disparador": "{{job.trigger.type}}",
+          "workspace_url": "{{workspace.url}}"
+        }
+      }
+    },
+    {
+      "task_key": "condicion",
+      "description": "numero > umbral ?",
+      "depends_on": [
+        {
+          "task_key": "parametros"
+        }
+      ],
+      "condition_task": {
+        "op": "GREATER_THAN",
+        "left": "{{tasks.parametros.values.numero}}",
+        "right": "{{job.parameters.umbral}}"
+      }
+    },
+    {
+      "task_key": "rama_alta",
+      "depends_on": [
+        {
+          "task_key": "condicion",
+          "outcome": "true"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/10_rama_alta",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "rama": "alta"
+        }
+      }
+    },
+    {
+      "task_key": "rama_baja",
+      "depends_on": [
+        {
+          "task_key": "condicion",
+          "outcome": "false"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/11_rama_baja",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "rama": "baja"
+        }
+      }
+    },
+    {
+      "task_key": "recoger",
+      "description": "Junta las dos ramas: una siempre esta saltada",
+      "depends_on": [
+        {
+          "task_key": "rama_alta"
+        },
+        {
+          "task_key": "rama_baja"
+        }
+      ],
+      "run_if": "AT_LEAST_ONE_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/12_recoger",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "bucle",
+      "description": "for_each sobre la lista publicada por 'parametros'",
+      "depends_on": [
+        {
+          "task_key": "parametros"
+        }
+      ],
+      "for_each_task": {
+        "inputs": "{{tasks.parametros.values.lista}}",
+        "concurrency": 2,
+        "task": {
+          "task_key": "procesa_item",
+          "notebook_task": {
+            "notebook_path": "/demo_task_advanced/20_procesa_item",
+            "source": "WORKSPACE",
+            "base_parameters": {
+              "item": "{{input}}",
+              "entorno": "{{job.parameters.entorno}}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "task_key": "inestable",
+      "description": "Falla aleatoriamente para ver reintentos y run_if",
+      "depends_on": [
+        {
+          "task_key": "parametros"
+        }
+      ],
+      "max_retries": 2,
+      "min_retry_interval_millis": 10000,
+      "retry_on_timeout": true,
+      "timeout_seconds": 300,
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/30_inestable",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "prob_fallo": "{{job.parameters.prob_fallo}}",
+          "intento": "{{job.repair_count}}"
+        }
+      }
+    },
+    {
+      "task_key": "limpieza",
+      "description": "El 'finally' del job",
+      "depends_on": [
+        {
+          "task_key": "inestable"
+        }
+      ],
+      "run_if": "ALL_DONE",
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/31_limpieza",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "alerta_fallo",
+      "depends_on": [
+        {
+          "task_key": "inestable"
+        }
+      ],
+      "run_if": "AT_LEAST_ONE_FAILED",
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/32_alerta",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "motivo": "al menos una dependencia fallo",
+          "run_url": "{{workspace.url}}/jobs/{{job.id}}/runs/{{job.run_id}}"
+        }
+      }
+    },
+    {
+      "task_key": "todo_fallo",
+      "depends_on": [
+        {
+          "task_key": "inestable"
+        }
+      ],
+      "run_if": "ALL_FAILED",
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/32_alerta",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "motivo": "TODAS las dependencias fallaron",
+          "run_url": "{{workspace.url}}/jobs/{{job.id}}/runs/{{job.run_id}}"
+        }
+      }
+    },
+    {
+      "task_key": "sin_fallos",
+      "description": "NONE_FAILED: tolera saltadas, no tolera falladas",
+      "depends_on": [
+        {
+          "task_key": "recoger"
+        },
+        {
+          "task_key": "bucle"
+        }
+      ],
+      "run_if": "NONE_FAILED",
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/32_alerta",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "motivo": "ramas y bucle terminaron sin fallos"
+        }
+      }
+    },
+    {
+      "task_key": "resumen",
+      "description": "Recoge todos los taskValues del grafo",
+      "depends_on": [
+        {
+          "task_key": "recoger"
+        },
+        {
+          "task_key": "bucle"
+        },
+        {
+          "task_key": "limpieza"
+        }
+      ],
+      "run_if": "ALL_DONE",
+      "notebook_task": {
+        "notebook_path": "/demo_task_advanced/40_resumen",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "run_id": "{{job.run_id}}",
+          "entorno": "{{job.parameters.entorno}}"
+        }
+      }
+    }
+  ]
+}

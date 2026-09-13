@@ -1,0 +1,65 @@
+{
+  "name": "demo-task-basic",
+  "description": "Version minima: dos tasks encadenadas. Punto de partida para ir ampliando hacia job.json",
+  "max_concurrent_runs": 1,
+  "queue": {
+    "enabled": true
+  },
+  "parameters": [
+    {
+      "name": "entorno",
+      "default": "dev"
+    },
+    {
+      "name": "umbral",
+      "default": "50"
+    },
+    {
+      "name": "items",
+      "default": "alfa,beta,gamma"
+    },
+    {
+      "name": "modo",
+      "default": "rapido"
+    }
+  ],
+  "tasks": [
+    {
+      "task_key": "parametros",
+      "description": "Lee parametros y valores dinamicos, publica taskValues",
+      "notebook_task": {
+        "notebook_path": "/00_parametros",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "entorno": "{{job.parameters.entorno}}",
+          "umbral": "{{job.parameters.umbral}}",
+          "items": "{{job.parameters.items}}",
+          "modo": "{{job.parameters.modo}}",
+          "job_id": "{{job.id}}",
+          "run_id": "{{job.run_id}}",
+          "task_name": "{{task.name}}",
+          "fecha_run": "{{job.start_time.iso_date}}",
+          "disparador": "{{job.trigger.type}}",
+          "workspace_url": "{{workspace.url}}"
+        }
+      }
+    },
+    {
+      "task_key": "leer",
+      "description": "Consume los taskValues de la task anterior",
+      "depends_on": [
+        {
+          "task_key": "parametros"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/01_leer_valores",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "entorno": "{{job.parameters.entorno}}",
+          "run_id": "{{job.run_id}}"
+        }
+      }
+    }
+  ]
+}

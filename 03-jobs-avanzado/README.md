@@ -1,0 +1,181 @@
+# demo-task-advanced — parámetros, ramas, bucles y `run_if`
+
+Job "kitchen sink" para tocar de una vez casi todo lo que la doc de Jobs deja
+configurar. Todas las tasks son notebooks sin cluster declarado, así que corren
+en **serverless** (vale en Free Edition).
+
+Hay **dos jobs** sobre los mismos notebooks:
+
+| Fichero | Tasks | Para qué |
+|---|---|---|
+| [job_basic.json](job_basic.json) | 2 | Lo mínimo que funciona. Empieza por aquí y ve añadiendo |
+| [job.json](job.json) | 12 | El grafo completo, con todo lo de abajo |
+
+## Empezar por lo básico
+
+`job_basic.json` es solo `00_parametros` → `01_leer_valores`, y ya enseña las
+tres piezas que sostienen todo lo demás: parámetros de job, widgets y
+taskValues.
+
+```sh
+databricks jobs create --json @job_basic.json
+```
+
+Y a partir de ahí se amplía por capas, copiando bloques de `job.json`:
+
+1. **Ramificar** — añade `condicion` (`condition_task`) + `rama_alta` / `rama_baja`,
+   y `recoger` con `run_if: AT_LEAST_ONE_SUCCESS`.
+2. **Iterar** — añade `bucle` (`for_each_task`) sobre `{{tasks.parametros.values.lista}}`.
+3. **Fallar bien** — añade `inestable` con `max_retries`, y cuélgale `limpieza`
+   (`ALL_DONE`), `alerta_fallo` (`AT_LEAST_ONE_FAILED`) y `todo_fallo` (`ALL_FAILED`).
+4. **Cerrar** — añade `sin_fallos` (`NONE_FAILED`) y `resumen` (`ALL_DONE`).
+5. **Operar** — `schedule`, `health`, `tags`, `timeout_seconds`, notificaciones.
+
+Cada capa se aplica con `databricks jobs reset --job-id $JOB_ID --json @job_basic.json`
+(sustituye la definición entera) sin tener que borrar y recrear el job.
+
+## El grafo (job.json)
+
+```
+parametros ──┬── condicion (IF/ELSE) ──┬─[true] ── rama_alta ──┐
+             │                         └─[false]─ rama_baja ──┤
+             │                                                ├── recoger  (AT_LEAST_ONE_SUCCESS)
+             │                                                          │
+             ├── bucle (for_each sobre la lista) ──────────────────────┤
+             │                                                          ├── sin_fallos (NONE_FAILED)
+             │                                                          └── resumen    (ALL_DONE)
+             │                                                          │
+             └── inestable (falla random, 2 reintentos) ──┬── limpieza  (ALL_DONE)     ─┘
+                                                          ├── alerta_fallo (AT_LEAST_ONE_FAILED)
+                                                          └── todo_fallo   (ALL_FAILED)
+```
+
+## Qué demuestra cada cosa
+
+| Concepto | Dónde mirarlo |
+|---|---|
+| Parámetros de job | `job.json` → `parameters`, se leen como `{{job.parameters.x}}` |
+| Parámetros de task → widgets | `base_parameters` → `dbutils.widgets.get()` en [00_parametros.py](00_parametros.py) |
+| Valores dinámicos | `{{job.id}}`, `{{job.run_id}}`, `{{task.name}}`, `{{job.start_time.iso_date}}`, `{{job.trigger.type}}`, `{{workspace.url}}`, `{{job.repair_count}}` |
+| taskValues (salida) | `dbutils.jobs.taskValues.set` en [00_parametros.py](00_parametros.py) |
+| taskValues (entrada Python) | `dbutils.jobs.taskValues.get(..., default=)` en [40_resumen.py](40_resumen.py) |
+| taskValues (entrada JSON) | `{{tasks.parametros.values.numero}}` en el `condition_task` |
+| `condition_task` | task `condicion`, con `depends_on.outcome: "true"/"false"` |
+| `for_each_task` | task `bucle`: `inputs` + `concurrency`, y `{{input}}` en [20_procesa_item.py](20_procesa_item.py) |
+| Reintentos | `max_retries`, `min_retry_interval_millis`, `retry_on_timeout` en `inestable` |
+| Timeouts | `timeout_seconds` a nivel de job y de task |
+| Los 6 `run_if` | ver tabla de abajo |
+| Schedule cron (en pausa) | `schedule` con `pause_status: PAUSED` |
+| Health rule | `health` → aviso si el run pasa de 900 s |
+| Tags, queue, concurrencia | `tags`, `queue`, `max_concurrent_runs` |
+| Mismo notebook en dos tasks | `32_alerta` lo usan `alerta_fallo`, `todo_fallo` y `sin_fallos` |
+
+## Los seis `run_if`
+
+| Valor | Se ejecuta si… | Task de ejemplo |
+|---|---|---|
+| `ALL_SUCCESS` (por defecto) | todas las dependencias OK | `condicion`, `bucle` |
+| `AT_LEAST_ONE_SUCCESS` | al menos una OK | `recoger` |
+| `NONE_FAILED` | ninguna falló (saltadas sí valen) | `sin_fallos` |
+| `ALL_DONE` | todas terminaron, sea como sea | `limpieza`, `resumen` |
+| `AT_LEAST_ONE_FAILED` | al menos una falló | `alerta_fallo` |
+| `ALL_FAILED` | todas fallaron | `todo_fallo` |
+
+La trampa clásica: al ramificar con `condition_task`, la rama no tomada queda
+**SKIPPED**, no FAILED. Si la task que junta las ramas se deja con el
+`ALL_SUCCESS` por defecto, también se salta. Por eso `recoger` usa
+`AT_LEAST_ONE_SUCCESS`.
+
+## Desplegar
+
+```sh
+databricks auth login --host https://<tu-workspace>.cloud.databricks.com
+
+BASE=/demo_task_advanced
+databricks workspace mkdirs "$BASE"
+
+for f in *.py; do
+  databricks workspace import "$BASE/${f%.py}" \
+    --file "$f" --language PYTHON --format SOURCE --overwrite
+done
+
+databricks jobs create --json @job_basic.json    # o @job.json para el completo
+```
+
+Lanzar con los valores por defecto:
+
+```sh
+JOB_ID=$(databricks jobs list -o json \
+  | jq -r '.[] | select(.settings.name=="demo-task-basic") | .job_id')
+
+databricks jobs run-now $JOB_ID
+```
+
+Lanzar sobreescribiendo parámetros (aquí forzando la rama baja, más items y
+que `inestable` no falle nunca):
+
+```sh
+databricks jobs run-now $JOB_ID --json '{
+  "job_parameters": {
+    "umbral": "100",
+    "items": "uno,dos,tres,cuatro",
+    "prob_fallo": "0",
+    "entorno": "pro"
+  }
+}'
+```
+
+Para ver el camino de fallo entero, pon `"prob_fallo": "1"`: `inestable` gasta
+sus 2 reintentos, se marca FAILED, y se disparan `limpieza`, `alerta_fallo` y
+`todo_fallo`.
+
+Borrar:
+
+```sh
+databricks jobs delete $JOB_ID
+```
+
+## Cosas que no están y se añaden en dos líneas
+
+**Notificaciones por email** (a nivel de job o de task):
+
+```json
+"email_notifications": {
+  "on_start": [],
+  "on_success": ["tu-email@ejemplo.com"],
+  "on_failure": ["tu-email@ejemplo.com"],
+  "on_duration_warning_threshold_exceeded": ["tu-email@ejemplo.com"]
+},
+"notification_settings": {
+  "no_alert_for_skipped_runs": true,
+  "no_alert_for_canceled_runs": true
+}
+```
+
+**Llamar a otro job como task** (`run_job_task`), p. ej. al de `demo_job/`:
+
+```json
+{
+  "task_key": "llamar_otro_job",
+  "depends_on": [{ "task_key": "resumen" }],
+  "run_job_task": {
+    "job_id": 123456789,
+    "job_parameters": { "entorno": "dev" }
+  }
+}
+```
+
+**Trigger por llegada de fichero** en vez de cron:
+
+```json
+"trigger": {
+  "pause_status": "UNPAUSED",
+  "file_arrival": {
+    "url": "/Volumes/main/demo/landing/",
+    "min_time_between_triggers_seconds": 60,
+    "wait_after_last_change_seconds": 30
+  }
+}
+```
+
+**Task SQL** sobre un warehouse: ver [demo_sql](../demo_sql/).

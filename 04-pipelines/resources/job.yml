@@ -1,0 +1,91 @@
+# Job orquestador: genera datos, lanza los dos pipelines y valida el resultado.
+#
+# Lo interesante aquí es el `pipeline_task`: un pipeline no se "ejecuta" desde un
+# notebook, se lanza como una task de tipo pipeline. El job espera a que termine
+# y hereda su estado.
+#
+# `${resources.pipelines.X.id}` es una referencia del BUNDLE: la resuelve la CLI
+# al desplegar, cuando ya sabe el id que le tocó al pipeline. Escribir ese id a
+# mano es justo lo que el bundle te ahorra.
+
+resources:
+  jobs:
+    demo_pipeline_job:
+      name: demo-pipeline-${bundle.target}
+      description: Genera datos, ejecuta los pipelines SQL y Python, y valida
+
+      tags:
+        proyecto: certificacion
+        tema: declarative-pipelines
+
+      max_concurrent_runs: 1
+      timeout_seconds: 7200
+      queue:
+        enabled: true
+
+      parameters:
+        - name: lote
+          default: "1"
+        - name: filas_toxicas
+          default: "no"
+        - name: reiniciar
+          default: "no"
+
+      tasks:
+        # --- 1. Fabricar los ficheros de entrada -------------------------
+        - task_key: generar_datos
+          description: Escribe los JSON en el Volume de landing
+          notebook_task:
+            notebook_path: ../src/generar_datos.py
+            base_parameters:
+              catalogo: ${var.catalogo}
+              esquema_landing: ${var.esquema_landing}
+              lote: "{{job.parameters.lote}}"
+              filas_toxicas: "{{job.parameters.filas_toxicas}}"
+              reiniciar: "{{job.parameters.reiniciar}}"
+
+        # --- 2. Los dos pipelines, EN SERIE ------------------------------
+        # Lo natural sería ponerlos en paralelo (no dependen entre sí), pero
+        # cada pipeline levanta su propio compute serverless y la cuota de la
+        # cuenta no da para los dos a la vez:
+        #   RESOURCE_EXHAUSTED: You've hit the limit for serverless compute
+        # Encadenándolos, el segundo arranca cuando el primero ha soltado el suyo.
+        - task_key: pipeline_sql
+          description: Ejecuta el pipeline declarado en SQL
+          depends_on:
+            - task_key: generar_datos
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.demo_pipeline_sql.id}
+            # full_refresh: true  -> reprocesa TODO desde cero, ignorando los
+            # checkpoints. Necesario si cambias la lógica de una streaming table
+            # o si borras la landing.
+            full_refresh: false
+
+        - task_key: pipeline_python
+          description: Ejecuta el pipeline declarado en Python
+          depends_on:
+            - task_key: pipeline_sql    # <- en serie, por la cuota de serverless
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.demo_pipeline_python.id}
+            full_refresh: false
+
+        # --- 3. Validar cada uno, también en serie -----------------------
+        - task_key: validar_sql
+          depends_on:
+            - task_key: pipeline_python   # <- en serie, por la cuota
+          notebook_task:
+            notebook_path: ../src/validar_resultado.py
+            base_parameters:
+              catalogo: ${var.catalogo}
+              esquema: ${var.esquema_sql}
+              pipeline_id: ${resources.pipelines.demo_pipeline_sql.id}
+
+        - task_key: validar_python
+          depends_on:
+            - task_key: validar_sql       # <- en serie, por la cuota
+          notebook_task:
+            notebook_path: ../src/validar_resultado.py
+            base_parameters:
+              catalogo: ${var.catalogo}
+              esquema: ${var.esquema_python}
+              pipeline_id: ${resources.pipelines.demo_pipeline_python.id}

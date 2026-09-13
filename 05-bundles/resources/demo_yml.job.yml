@@ -1,0 +1,120 @@
+# El mismo tipo de job que demo_task_advanced, pero declarado en YAML dentro
+# de un bundle. Diferencias respecto al job.json suelto:
+#
+#   - los notebook_path son RUTAS RELATIVAS del repo; el bundle los sube solo
+#   - hay ${var.x} (bundle) ademas de {{job.parameters.x}} (runtime)
+#   - el nombre y el schedule cambian segun el target (dev / pro)
+
+resources:
+  jobs:
+    demo_yml_job:
+      name: demo-yml-${bundle.target}
+      description: Demo de Asset Bundle con parametros, condicion y for_each
+
+      tags:
+        proyecto: certificacion
+        origen: bundle
+
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      queue:
+        enabled: true
+
+      schedule:
+        quartz_cron_expression: "0 30 6 * * ?"
+        timezone_id: Europe/Madrid
+        # En dev, `mode: development` lo fuerza a PAUSED igualmente.
+        pause_status: UNPAUSED
+
+      email_notifications:
+        on_failure:
+          - ${var.notificar_a}
+      notification_settings:
+        no_alert_for_skipped_runs: true
+
+      health:
+        rules:
+          - metric: RUN_DURATION_SECONDS
+            op: GREATER_THAN
+            value: 900
+
+      # Parametros de RUNTIME: se pueden cambiar en cada ejecucion sin
+      # redesplegar. Sus defaults salen de las variables del BUNDLE.
+      parameters:
+        - name: catalogo
+          default: ${var.catalogo}
+        - name: esquema
+          default: ${var.esquema}
+        - name: items
+          default: ${var.items}
+        - name: umbral
+          default: "50"
+
+      tasks:
+        - task_key: preparar
+          description: Crea el esquema y publica la lista para el bucle
+          notebook_task:
+            notebook_path: ../src/00_preparar.py
+            base_parameters:
+              catalogo: "{{job.parameters.catalogo}}"
+              esquema: "{{job.parameters.esquema}}"
+              items: "{{job.parameters.items}}"
+              # El target del bundle se resuelve al DESPLEGAR, no al ejecutar.
+              target: ${bundle.target}
+              run_id: "{{job.run_id}}"
+
+        - task_key: bucle
+          depends_on:
+            - task_key: preparar
+          for_each_task:
+            inputs: "{{tasks.preparar.values.lista}}"
+            concurrency: 2
+            task:
+              task_key: cargar_item
+              notebook_task:
+                notebook_path: ../src/10_cargar_item.py
+                base_parameters:
+                  item: "{{input}}"
+                  tabla: "{{tasks.preparar.values.tabla}}"
+
+        - task_key: hay_datos
+          depends_on:
+            - task_key: bucle
+          condition_task:
+            op: GREATER_THAN
+            left: "{{tasks.preparar.values.n_items}}"
+            right: "{{job.parameters.umbral}}"
+
+        - task_key: muchos
+          depends_on:
+            - task_key: hay_datos
+              outcome: "true"
+          notebook_task:
+            notebook_path: ../src/20_reporte.py
+            base_parameters:
+              veredicto: por encima del umbral
+              tabla: "{{tasks.preparar.values.tabla}}"
+
+        - task_key: pocos
+          depends_on:
+            - task_key: hay_datos
+              outcome: "false"
+          notebook_task:
+            notebook_path: ../src/20_reporte.py
+            base_parameters:
+              veredicto: por debajo del umbral
+              tabla: "{{tasks.preparar.values.tabla}}"
+
+        - task_key: cierre
+          description: Corre siempre, haya ido bien o mal
+          depends_on:
+            - task_key: muchos
+            - task_key: pocos
+          run_if: ALL_DONE
+          max_retries: 1
+          min_retry_interval_millis: 10000
+          notebook_task:
+            notebook_path: ../src/30_cierre.py
+            base_parameters:
+              tabla: "{{tasks.preparar.values.tabla}}"
+              run_id: "{{job.run_id}}"
