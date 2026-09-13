@@ -58,7 +58,13 @@ ALTER TABLE config_demo UNSET TBLPROPERTIES ('delta.targetFileSize');
 
 -- COMMAND ----------
 
-CREATE OR REPLACE TABLE bronze_log (ts TIMESTAMP, evento STRING)
+-- DROP + CREATE, y no `CREATE OR REPLACE`. Si la tabla ya existe con
+-- appendOnly, un REPLACE cuenta como BORRAR sus datos y lo prohíbe la propia
+-- propiedad: la segunda ejecución de este notebook moriría con
+--   DELTA_CANNOT_MODIFY_APPEND_ONLY
+-- `DROP TABLE`, en cambio, sí se permite: appendOnly protege los datos, no la tabla.
+DROP TABLE IF EXISTS bronze_log;
+CREATE TABLE bronze_log (ts TIMESTAMP, evento STRING)
 TBLPROPERTIES ('delta.appendOnly' = true);
 
 INSERT INTO bronze_log VALUES (current_timestamp(), 'arranque');

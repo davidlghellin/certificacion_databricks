@@ -100,8 +100,12 @@ display(spark.sql(f"SHOW TBLPROPERTIES {CDF_TBL}"))
 # COMMAND ----------
 
 BRONZE = f"{CATALOGO}.{ESQUEMA}.bronze_log"
+# DROP + CREATE, y no `CREATE OR REPLACE`: sobre una tabla que ya es appendOnly,
+# un REPLACE cuenta como borrar sus datos y falla con DELTA_CANNOT_MODIFY_APPEND_ONLY
+# en la segunda ejecución. `DROP TABLE` sí se permite.
+spark.sql(f"DROP TABLE IF EXISTS {BRONZE}")
 spark.sql(f"""
-    CREATE OR REPLACE TABLE {BRONZE} (ts TIMESTAMP, evento STRING)
+    CREATE TABLE {BRONZE} (ts TIMESTAMP, evento STRING)
     TBLPROPERTIES ('delta.appendOnly' = true)
 """)
 spark.sql(f"INSERT INTO {BRONZE} VALUES (current_timestamp(), 'arranque')")

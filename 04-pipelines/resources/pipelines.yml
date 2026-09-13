@@ -22,8 +22,8 @@ resources:
       name: demo-pipeline-sql-${bundle.target}
       catalog: ${var.catalogo}
       schema: ${var.esquema_sql}
-      # Obligatorio en este workspace: declarar `clusters:` con compute clásico
-      # lo rechaza el deploy con
+      # Serverless es OBLIGATORIO en este workspace. NO declares `clusters:` con
+      # compute clásico: el deploy lo rechaza con
       #   INVALID_PARAMETER_VALUE: You must use serverless compute in this workspace
       serverless: true
       # Ojo con la cuota: si hay otro workload serverless vivo, el update muere con
@@ -58,8 +58,8 @@ resources:
       name: demo-pipeline-python-${bundle.target}
       catalog: ${var.catalogo}
       schema: ${var.esquema_python}
-      # Obligatorio en este workspace: declarar `clusters:` con compute clásico
-      # lo rechaza el deploy con
+      # Serverless es OBLIGATORIO en este workspace. NO declares `clusters:` con
+      # compute clásico: el deploy lo rechaza con
       #   INVALID_PARAMETER_VALUE: You must use serverless compute in this workspace
       serverless: true
       # Ojo con la cuota: si hay otro workload serverless vivo, el update muere con

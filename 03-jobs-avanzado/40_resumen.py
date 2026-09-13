@@ -2,7 +2,7 @@
 # run_if = ALL_DONE, y depende de casi todo el grafo.
 #
 # Recoge los taskValues de las tasks anteriores. Como algunas pueden estar
-# saltadas o falladas, cada lectura va con `default=`.
+# excluidas o falladas, cada lectura va con `default=`.
 import json
 
 
@@ -24,7 +24,7 @@ resumen = {
     "numero": leer("parametros", "numero", -1),
     "lista": leer("parametros", "lista", []),
     "rama": leer("recoger", "rama", "?"),
-    "inestable": leer("inestable", "resultado", "fallo_o_saltada"),
+    "inestable": leer("inestable", "resultado", "fallo_o_excluida"),
     "limpieza": leer("limpieza", "limpieza", "no_ejecutada"),
 }
 

@@ -25,7 +25,10 @@ def n_ficheros(tabla=TABLA):
 
 # COMMAND ----------
 
-spark.sql(f"CREATE OR REPLACE TABLE {TABLA} (id INT, sensor STRING, valor DOUBLE)")
+# DROP antes de crear: `CREATE OR REPLACE` conserva el historial y las propiedades
+# que una ejecución anterior dejó puestas (deletion vectors, autoOptimize...).
+spark.sql(f"DROP TABLE IF EXISTS {TABLA}")
+spark.sql(f"CREATE TABLE {TABLA} (id INT, sensor STRING, valor DOUBLE)")
 
 # 5 escrituras = 5 commits = al menos 5 ficheros
 for i, s in enumerate(["a", "b", "a", "c", "b"], start=1):
@@ -212,10 +215,12 @@ display(dt.vacuum(retentionHours=168))
 # COMMAND ----------
 
 # Esta config puede estar bloqueada en serverless, igual que la de autoMerge.
+vacuum_cero_hecho = False
 try:
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     dt.vacuum(retentionHours=0)
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    vacuum_cero_hecho = True
     print("VACUUM con retención 0 ejecutado")
 except Exception as e:
     print("No se ha podido forzar retención 0 (normal en serverless):")
@@ -228,12 +233,20 @@ display(dt.history().select("version", "operation").orderBy("version"))
 
 # COMMAND ----------
 
-# ...pero leerlas ya falla: los ficheros no están.
-try:
-    spark.read.option("versionAsOf", 1).table(TABLA).show()
-except Exception as e:
-    print("Time travel roto por el VACUUM, como se esperaba:")
-    print(str(e)[:300])
+# ...pero leerlas falla, porque los ficheros ya no están. OJO: solo si el VACUUM
+# con retención 0 llegó a ejecutarse. En serverless la config está bloqueada, el
+# VACUUM no se hace, y la versión antigua sigue siendo legible: no hay que sacar
+# la conclusión equivocada de que "el time travel sobrevive a un VACUUM".
+if not vacuum_cero_hecho:
+    print("No se forzó el VACUUM con retención 0, así que la versión 1 SIGUE legible.")
+    print("En compute clásico, con la config permitida, esta lectura fallaría.")
+else:
+    try:
+        spark.read.option("versionAsOf", 1).table(TABLA).show()
+        print("La versión 1 sigue legible: ningún fichero suyo cumplía la retención.")
+    except Exception as e:
+        print("Time travel roto por el VACUUM, como se esperaba:")
+        print(str(e)[:300])
 
 # COMMAND ----------
 

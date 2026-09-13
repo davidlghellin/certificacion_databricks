@@ -37,18 +37,20 @@ Cada capa se aplica con `databricks jobs reset --job-id $JOB_ID --json @job_basi
 ## El grafo (job.json)
 
 ```
-parametros ──┬── condicion (IF/ELSE) ──┬─[true] ── rama_alta ──┐
-             │                         └─[false]─ rama_baja ──┤
-             │                                                ├── recoger  (AT_LEAST_ONE_SUCCESS)
-             │                                                          │
-             ├── bucle (for_each sobre la lista) ──────────────────────┤
-             │                                                          ├── sin_fallos (NONE_FAILED)
-             │                                                          └── resumen    (ALL_DONE)
-             │                                                          │
-             └── inestable (falla random, 2 reintentos) ──┬── limpieza  (ALL_DONE)     ─┘
-                                                          ├── alerta_fallo (AT_LEAST_ONE_FAILED)
-                                                          └── todo_fallo   (ALL_FAILED)
+parametros ─┬─ condicion (IF/ELSE) ─┬─[true]── rama_alta ─┐
+            │                       └─[false]─ rama_baja ─┼─ recoger    (AT_LEAST_ONE_SUCCESS)
+            │                                             │
+            ├─ bucle (for_each) ──────────────────────────┴─ sin_fallos (NONE_FAILED)
+            │                                                ↑ ve las dos ramas directamente
+            │
+            ├─ inestable (falla random) ─┬─ limpieza (ALL_DONE) ── resumen (ALL_DONE)
+            │                            │
+            └────────────────────────────┴─ alerta_fallo (AT_LEAST_ONE_FAILED)
+                                         └─ todo_fallo   (ALL_FAILED)
+                                            ↑ las dos dependen de [inestable, parametros]
 ```
+
+`resumen` depende también de `recoger` y `bucle`.
 
 ## Qué demuestra cada cosa
 
@@ -76,15 +78,46 @@ parametros ──┬── condicion (IF/ELSE) ──┬─[true] ── rama_al
 |---|---|---|
 | `ALL_SUCCESS` (por defecto) | todas las dependencias OK | `condicion`, `bucle` |
 | `AT_LEAST_ONE_SUCCESS` | al menos una OK | `recoger` |
-| `NONE_FAILED` | ninguna falló (saltadas sí valen) | `sin_fallos` |
+| `NONE_FAILED` | ninguna falló (tolera EXCLUDED si otra fue bien) | `sin_fallos` |
 | `ALL_DONE` | todas terminaron, sea como sea | `limpieza`, `resumen` |
 | `AT_LEAST_ONE_FAILED` | al menos una falló | `alerta_fallo` |
 | `ALL_FAILED` | todas fallaron | `todo_fallo` |
 
 La trampa clásica: al ramificar con `condition_task`, la rama no tomada queda
-**SKIPPED**, no FAILED. Si la task que junta las ramas se deja con el
-`ALL_SUCCESS` por defecto, también se salta. Por eso `recoger` usa
-`AT_LEAST_ONE_SUCCESS`.
+**EXCLUDED**, no FAILED. Y EXCLUDED **no cuenta como éxito**: si la task que junta
+las ramas se deja con el `ALL_SUCCESS` por defecto, queda también EXCLUDED y no se
+ejecuta. Por eso `recoger` usa `AT_LEAST_ONE_SUCCESS`.
+
+### Cómo se comportan los estados, verificado en un workspace real
+
+| Dependencias | `run_if` de la hija | Resultado de la hija |
+|---|---|---|
+| SUCCESS + EXCLUDED | `ALL_SUCCESS` | **EXCLUDED**, no se ejecuta |
+| SUCCESS + EXCLUDED | `AT_LEAST_ONE_SUCCESS` | se ejecuta |
+| SUCCESS + EXCLUDED | `NONE_FAILED` | se ejecuta |
+| solo EXCLUDED | `ALL_SUCCESS` o `NONE_FAILED` | **EXCLUDED**: la exclusión se propaga |
+| FAILED + EXCLUDED | `AT_LEAST_ONE_SUCCESS` | **UPSTREAM_FAILED** |
+| UPSTREAM_FAILED | `NONE_FAILED` | UPSTREAM_FAILED |
+| FAILED + SUCCESS | `AT_LEAST_ONE_FAILED` | se ejecuta |
+| FAILED + SUCCESS | `ALL_FAILED` | **EXCLUDED** |
+
+EXCLUDED no es ni éxito ni fallo: `ALL_SUCCESS` no lo acepta, y `NONE_FAILED` y
+`AT_LEAST_ONE_SUCCESS` lo toleran solo si **otra** dependencia salió bien.
+
+### Dos detalles de diseño que hacen visible cada `run_if`
+
+**`AT_LEAST_ONE_FAILED` vs `ALL_FAILED`.** Con una sola dependencia son
+indistinguibles: las dos se ejecutan exactamente cuando esa falla. Por eso
+`alerta_fallo` y `todo_fallo` dependen de **`[inestable, parametros]`**, y
+`parametros` siempre sale bien. Cuando `inestable` falla hay una fallida y una
+correcta, y se ven lado a lado: `alerta_fallo` **se ejecuta** y `todo_fallo`
+queda **EXCLUDED**.
+
+**`NONE_FAILED` depende de las ramas para que se vea qué tolera.** `sin_fallos`
+depende de `rama_alta`, `rama_baja` y `bucle`. En la ejecución normal una rama sale
+bien y la otra queda EXCLUDED: `NONE_FAILED` se ejecuta igual, que es justo lo que
+`ALL_SUCCESS` no haría. Si la rama tomada falla, `sin_fallos` queda
+UPSTREAM_FAILED y no se ejecuta.
 
 ## Desplegar
 
@@ -105,8 +138,11 @@ databricks jobs create --json @job_basic.json    # o @job.json para el completo
 Lanzar con los valores por defecto:
 
 ```sh
+# El nombre depende del JSON que creaste:
+#   job_basic.json -> demo-task-basic      job.json -> demo-task-advanced
+NOMBRE=demo-task-advanced
 JOB_ID=$(databricks jobs list -o json \
-  | jq -r '.[] | select(.settings.name=="demo-task-basic") | .job_id')
+  | jq -r --arg n "$NOMBRE" '.[] | select(.settings.name==$n) | .job_id')
 
 databricks jobs run-now $JOB_ID
 ```
@@ -115,14 +151,17 @@ Lanzar sobreescribiendo parámetros (aquí forzando la rama baja, más items y
 que `inestable` no falle nunca):
 
 ```sh
-databricks jobs run-now $JOB_ID --json '{
-  "job_parameters": {
-    "umbral": "100",
-    "items": "uno,dos,tres,cuatro",
-    "prob_fallo": "0",
-    "entorno": "pro"
+# Con --json el job_id va DENTRO del JSON: pasarlo además como argumento da
+#   "when --json flag is specified, no positional arguments are allowed"
+databricks jobs run-now --json "{
+  \"job_id\": $JOB_ID,
+  \"job_parameters\": {
+    \"umbral\": \"100\",
+    \"items\": \"uno,dos,tres,cuatro\",
+    \"prob_fallo\": \"0\",
+    \"entorno\": \"pro\"
   }
-}'
+}"
 ```
 
 Para ver el camino de fallo entero, pon `"prob_fallo": "1"`: `inestable` gasta

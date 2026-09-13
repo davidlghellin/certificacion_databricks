@@ -20,7 +20,10 @@
 USE CATALOG main;
 USE SCHEMA demo_delta;
 
-CREATE OR REPLACE TABLE origen (id INT, valor STRING);
+-- DROP antes de crear: `CREATE OR REPLACE` CONSERVA el historial, y este notebook
+-- lee versiones fijas. En una segunda ejecución esas versiones serían de la anterior.
+DROP TABLE IF EXISTS origen;
+CREATE TABLE origen (id INT, valor STRING);
 INSERT INTO origen VALUES (1, 'uno'), (2, 'dos'), (3, 'tres');
 
 SELECT * FROM origen ORDER BY id;

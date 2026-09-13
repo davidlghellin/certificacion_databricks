@@ -1,9 +1,19 @@
+"""Delta Lake OSS en local, fuera de Databricks.
+
+    pip install pyspark delta-spark
+    python demo_delta_local.py
+
+No se llama `test_*.py` a propósito: pytest lo recogería como test y lo
+ejecutaría al importarlo, con sus escrituras en /tmp y sin comprobar nada.
+"""
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
 builder = (
     SparkSession.builder
-    .appName("delta-test")
+    .appName("delta-local")
+    # Explícito: así funciona igual con `python` que con `spark-submit`.
+    .master("local[*]")
     .config(
         "spark.sql.extensions",
         "io.delta.sql.DeltaSparkSessionExtension"

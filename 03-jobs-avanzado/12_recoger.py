@@ -2,10 +2,14 @@
 # run_if = AT_LEAST_ONE_SUCCESS
 #
 # Depende de las DOS ramas, pero solo una llega a ejecutarse; la otra queda
-# SKIPPED. Con el run_if por defecto (ALL_SUCCESS) esta task tambien se
-# saltaria, que es el error clasico al ramificar.
+# EXCLUDED. Con el run_if por defecto (ALL_SUCCESS) esta task quedaría también
+# EXCLUDED y no se ejecutaría: EXCLUDED no cuenta como éxito. Verificado: es el
+# error clásico al ramificar.
 #
-# Leer un taskValue de una task saltada lanza excepcion, por eso `default=`.
+# Si la rama que SÍ se ejecuta falla, esta task queda UPSTREAM_FAILED (no
+# EXCLUDED), y el fallo se propaga aguas abajo.
+#
+# Leer un taskValue de una task excluida lanza excepción, por eso `default=`.
 def leer(task, clave, por_defecto):
     try:
         return dbutils.jobs.taskValues.get(

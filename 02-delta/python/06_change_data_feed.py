@@ -22,9 +22,14 @@ TABLA = f"{CATALOGO}.{ESQUEMA}.cuentas"
 
 # COMMAND ----------
 
+# DROP antes de crear: `CREATE OR REPLACE` CONSERVA el historial, y las lecturas
+# de abajo usan versiones fijas (startingVersion=1, endingVersion=3...). En una
+# segunda ejecución apuntarían a los commits de la ejecución anterior.
+spark.sql(f"DROP TABLE IF EXISTS {TABLA}")
+
 # Activar al crear...
 spark.sql(f"""
-    CREATE OR REPLACE TABLE {TABLA} (id INT, titular STRING, saldo DOUBLE)
+    CREATE TABLE {TABLA} (id INT, titular STRING, saldo DOUBLE)
     TBLPROPERTIES ('delta.enableChangeDataFeed' = true)
 """)
 

@@ -11,7 +11,10 @@
 USE CATALOG main;
 USE SCHEMA demo_delta;
 
-CREATE OR REPLACE TABLE metricas (id INT, sensor STRING, valor DOUBLE);
+-- DROP antes de crear: `CREATE OR REPLACE` conserva el historial y las propiedades
+-- que una ejecución anterior dejó puestas (deletion vectors, autoOptimize...).
+DROP TABLE IF EXISTS metricas;
+CREATE TABLE metricas (id INT, sensor STRING, valor DOUBLE);
 
 -- 5 INSERT = 5 commits = al menos 5 ficheros
 INSERT INTO metricas VALUES (1, 'a', 1.0);
@@ -229,8 +232,10 @@ SELECT version, operation FROM (DESCRIBE HISTORY metricas) ORDER BY version;
 
 -- COMMAND ----------
 
--- ...pero leerlas ya falla, porque los ficheros no están.
--- Descomenta para ver el FileNotFoundException:
+-- ...pero leerlas falla, porque los ficheros ya no están. OJO: solo si el VACUUM
+-- con retención 0 de la celda anterior SÍ llegó a ejecutarse. En serverless esa
+-- config está bloqueada, el VACUUM no se hace y la versión 1 sigue siendo legible.
+-- En compute clásico, descomenta para ver el error de fichero no encontrado:
 -- SELECT * FROM metricas VERSION AS OF 1;
 
 -- COMMAND ----------

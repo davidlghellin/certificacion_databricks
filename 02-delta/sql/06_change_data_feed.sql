@@ -13,8 +13,12 @@
 USE CATALOG main;
 USE SCHEMA demo_delta;
 
+-- DROP antes de crear: `CREATE OR REPLACE` CONSERVA el historial, y este notebook
+-- lee versiones fijas. En una segunda ejecución esas versiones serían de la anterior.
+DROP TABLE IF EXISTS cuentas;
+
 -- Se puede activar al crear...
-CREATE OR REPLACE TABLE cuentas (
+CREATE TABLE cuentas (
   id      INT,
   titular STRING,
   saldo   DOUBLE

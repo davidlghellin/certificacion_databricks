@@ -1,9 +1,12 @@
 # Databricks notebook source
 # Una iteracion del for_each. Escribe una fila por item.
 #
-# Cada iteracion es una task-run independiente y puede correr en paralelo con
-# las otras (concurrency: 2), asi que se usa MERGE en vez de INSERT para que
-# el resultado sea idempotente si el job se reintenta.
+# Cada iteracion es una task-run independiente. Se usa MERGE en vez de INSERT
+# para que el resultado sea idempotente si el job se reintenta.
+#
+# El bucle corre con `concurrency: 1` (resources/demo_yml.job.yml): dos MERGE a
+# la vez sobre esta misma tabla chocarian por concurrencia optimista
+# (ConcurrentAppendException). Idempotente no significa libre de conflictos.
 from pyspark.sql.functions import current_timestamp, lit
 
 dbutils.widgets.text("item", "?")

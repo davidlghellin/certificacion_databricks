@@ -116,7 +116,7 @@
     },
     {
       "task_key": "recoger",
-      "description": "Junta las dos ramas: una siempre esta saltada",
+      "description": "Junta las dos ramas: una siempre queda EXCLUDED",
       "depends_on": [
         {
           "task_key": "rama_alta"
@@ -195,6 +195,9 @@
       "depends_on": [
         {
           "task_key": "inestable"
+        },
+        {
+          "task_key": "parametros"
         }
       ],
       "run_if": "AT_LEAST_ONE_FAILED",
@@ -205,13 +208,17 @@
           "motivo": "al menos una dependencia fallo",
           "run_url": "{{workspace.url}}/jobs/{{job.id}}/runs/{{job.run_id}}"
         }
-      }
+      },
+      "description": "AT_LEAST_ONE_FAILED sobre [inestable, parametros]: si inestable falla, basta con esa -> se ejecuta"
     },
     {
       "task_key": "todo_fallo",
       "depends_on": [
         {
           "task_key": "inestable"
+        },
+        {
+          "task_key": "parametros"
         }
       ],
       "run_if": "ALL_FAILED",
@@ -222,14 +229,18 @@
           "motivo": "TODAS las dependencias fallaron",
           "run_url": "{{workspace.url}}/jobs/{{job.id}}/runs/{{job.run_id}}"
         }
-      }
+      },
+      "description": "ALL_FAILED sobre [inestable, parametros]: parametros siempre sale bien, asi que queda EXCLUDED aunque inestable falle"
     },
     {
       "task_key": "sin_fallos",
-      "description": "NONE_FAILED: tolera saltadas, no tolera falladas",
+      "description": "NONE_FAILED sobre las dos ramas y el bucle: tolera la rama no tomada (EXCLUDED) mientras otra dependencia haya ido bien; ALL_SUCCESS no la toleraria",
       "depends_on": [
         {
-          "task_key": "recoger"
+          "task_key": "rama_alta"
+        },
+        {
+          "task_key": "rama_baja"
         },
         {
           "task_key": "bucle"

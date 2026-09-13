@@ -26,8 +26,12 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOGO}.{ESQUEMA}")
 spark.sql(f"USE CATALOG {CATALOGO}")
 spark.sql(f"USE SCHEMA {ESQUEMA}")
 
+# DROP antes de crear: `mode("overwrite")` sobre una tabla existente AÑADE una
+# versión, no reinicia el historial. Más abajo se clona `VERSION AS OF 0`, que en
+# una segunda ejecución sería la de la ejecución anterior.
+spark.sql("DROP TABLE IF EXISTS origen")
 spark.createDataFrame([(1, "uno"), (2, "dos"), (3, "tres")], "id INT, valor STRING") \
-    .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("origen")
+    .write.saveAsTable("origen")
 
 display(spark.table("origen").orderBy("id"))
 

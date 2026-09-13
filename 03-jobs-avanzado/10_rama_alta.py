@@ -1,6 +1,6 @@
 # Databricks notebook source
 # Rama TRUE del condition_task: se ejecuta si numero > umbral.
-# La otra rama queda en estado SKIPPED (no FAILED): eso importa para el run_if
+# La otra rama queda EXCLUDED (no FAILED, y tampoco cuenta como éxito): eso importa para el run_if
 # de las tasks que vienen despues.
 dbutils.widgets.text("rama", "alta")
 

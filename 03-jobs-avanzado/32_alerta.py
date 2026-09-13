@@ -5,8 +5,12 @@
 #   alerta_fallo -> run_if = AT_LEAST_ONE_FAILED
 #   todo_fallo   -> run_if = ALL_FAILED
 #
-# Con una sola dependencia los dos run_if son equivalentes; se separan cuando
-# hay varias: AT_LEAST_ONE_FAILED basta con una, ALL_FAILED las quiere todas.
+# Las dos dependen de [inestable, parametros], y `parametros` siempre sale bien.
+# Eso es lo que hace visible la diferencia: cuando `inestable` falla hay UNA
+# fallida y UNA correcta, así que
+#   AT_LEAST_ONE_FAILED -> basta con una  -> se EJECUTA
+#   ALL_FAILED          -> las quiere todas -> queda EXCLUDED
+# Con una sola dependencia serían indistinguibles.
 dbutils.widgets.text("motivo", "sin motivo")
 dbutils.widgets.text("run_url", "")
 
