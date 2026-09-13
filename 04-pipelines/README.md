@@ -48,7 +48,14 @@ Todo de una vez, con el job orquestador:
 databricks bundle run demo_pipeline_job -t dev
 ```
 
-O pieza a pieza, que es más cómodo para depurar:
+**La primera vez, lanza el job orquestador**: es lo único que genera los ficheros
+de entrada (`generar_datos` es una task del job, no un recurso suelto). Si lanzas
+un pipeline antes de que exista ningún fichero, bronze no tiene nada que leer y
+`gold_control_calidad` falla su expectation `total_pedidos > 0`, que es de tipo
+`FAIL UPDATE`.
+
+Una vez hay datos en la landing, puedes lanzarlos pieza a pieza, que es más cómodo
+para depurar:
 
 ```sh
 databricks bundle run demo_pipeline_sql -t dev
@@ -69,8 +76,10 @@ databricks bundle run demo_pipeline_job -t dev --params filas_toxicas=si
 
 ## Empezar de cero
 
-Borrar la landing **no basta**: el checkpoint de cada pipeline recuerda qué ficheros
-ya leyó y no volvería a leerlos. Hace falta un *full refresh*:
+Un *full refresh* vacía las tablas del pipeline y **reprocesa todos los ficheros que
+haya en la landing**, olvidando lo que el checkpoint recordaba. Los ficheros no se
+borran, así que no hace falta regenerarlos. Si la landing estuviera vacía, lanza
+antes el job orquestador para crearlos:
 
 ```sh
 databricks bundle run demo_pipeline_sql    -t dev --full-refresh-all

@@ -23,13 +23,16 @@ Can be used in streaming tables to incrementally ingest files into Delta Lake us
 
 
 ```sql
+-- Sin columnas a propósito: es la tabla vacía de destino que documenta Databricks
+-- para COPY INTO (verificado: SUCCEEDED en un SQL warehouse). El esquema lo pone
+-- el primer COPY INTO, y para eso necesita 'mergeSchema' = 'true'.
 CREATE TABLE new_table;
-        
-        COPY INTO new_table
-        FROM '<dir_path>'
-        FILEFORMAT = <file_type>
-        FORMAT_OPTIONS (<options>)
-        COPY_OPTIONS (<options>)
+
+COPY INTO new_table
+FROM '<dir_path>'
+FILEFORMAT = <file_type>
+FORMAT_OPTIONS (<options>)
+COPY_OPTIONS ('mergeSchema' = 'true')
 ```
 
 COPY INTO
@@ -44,7 +47,17 @@ FROM clause: Specifies the path of the cloud storage location where new files ar
 FORMAT_OPTIONS(): Controls how the source files are parsed and interpreted (options depend on file format)
 COPY_OPTIONS(): Controls the behavior of the COPY INTO operation itself, such as:
 Schema evolution using (mergeSchema)
-Idempotency using (force)
+Idempotency override using (force): by default COPY INTO is idempotent and skips
+files already loaded; `'force' = 'true'` DISABLES that and reloads them.
+
+Verified on a real SQL warehouse, loading the same folder of JSON files four times:
+
+| Run | Result |
+|---|---|
+| Empty table, no `mergeSchema` | fails: `COPY_INTO_SCHEMA_MISMATCH_WITH_TARGET_TABLE` |
+| With `'mergeSchema' = 'true'` | 12 rows loaded |
+| Same command again | **0 rows loaded**, still 12: idempotent |
+| With `'force' = 'true'` | 12 rows loaded again, **24 in total: duplicates** |
 
 ```python
         (spark

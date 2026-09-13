@@ -1,7 +1,12 @@
 # Bundle del demo de Declarative Pipelines.
 #
 # Este fichero cubre dos temas a la vez: es el DAB (Declarative Automation Bundle)
-# y a la vez despliega los pipelines. Un pipeline es un recurso más del bundle,
+# y a la vez despliega los pipelines.
+#
+# Declarative Automation Bundles es el nombre OFICIAL actual; antes se llamaban
+# Databricks Asset Bundles y la sigla DAB se mantuvo. El cambio es de nombre, no
+# rompe nada: el comando sigue siendo `databricks bundle`.
+# Fuente: https://docs.databricks.com/aws/en/dev-tools/bundles Un pipeline es un recurso más del bundle,
 # igual que un job.
 #
 # Por qué un bundle y no `databricks pipelines create --json`: un pipeline tiene
