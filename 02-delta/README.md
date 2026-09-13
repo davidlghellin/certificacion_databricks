@@ -84,6 +84,10 @@ SQL_ID=$(databricks jobs list -o json \
 PY_ID=$(databricks jobs list -o json \
   | jq -r '.[] | select(.settings.name=="demo-delta-python") | .job_id')
 
+# `run-now` ESPERA a que el run termine (TERMINATED o SKIPPED) antes de devolver
+# el control; `--no-wait` es lo que haría que no esperase. Así que estas dos líneas
+# corren en serie, no a la vez. Ojo: el tiempo máximo por defecto es 20 minutos;
+# si un job tardara más, sube el límite con `--timeout 1h`.
 databricks jobs run-now $SQL_ID
 databricks jobs run-now $PY_ID
 ```

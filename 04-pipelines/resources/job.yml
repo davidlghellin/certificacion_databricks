@@ -67,7 +67,7 @@ resources:
         - task_key: pipeline_python
           description: Ejecuta el pipeline declarado en Python
           depends_on:
-            - task_key: pipeline_sql    # <- en serie, por la cuota de serverless
+            - task_key: validar_sql     # <- en serie por la cuota, DESPUÉS de validar el SQL
           pipeline_task:
             pipeline_id: ${resources.pipelines.demo_pipeline_python.id}
             full_refresh: false
@@ -75,7 +75,9 @@ resources:
         # --- 3. Validar cada uno, también en serie -----------------------
         - task_key: validar_sql
           depends_on:
-            - task_key: pipeline_python   # <- en serie, por la cuota
+            # Justo tras su pipeline: si el pipeline Python fallara después, esta
+            # validación ya habría corrido y no se perdería el diagnóstico del SQL.
+            - task_key: pipeline_sql
           notebook_task:
             notebook_path: ../src/validar_resultado.py
             base_parameters:
@@ -85,7 +87,7 @@ resources:
 
         - task_key: validar_python
           depends_on:
-            - task_key: validar_sql       # <- en serie, por la cuota
+            - task_key: pipeline_python   # <- valida su propio pipeline
           notebook_task:
             notebook_path: ../src/validar_resultado.py
             base_parameters:

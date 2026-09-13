@@ -30,7 +30,10 @@ nuevo.createOrReplaceTempView("nuevo")
 spark.sql(f"""
     MERGE INTO {tabla} t
     USING nuevo s ON t.item = s.item
-    WHEN MATCHED THEN UPDATE SET t.n = s.n, t.ts = s.ts
+    -- Solo si cambia el dato. Sin la condición, cada reintento reescribiría `ts`
+    -- con un current_timestamp() nuevo: la fila cambiaría en cada ejecución y el
+    -- MERGE no sería idempotente de verdad, aunque no duplicara nada.
+    WHEN MATCHED AND t.n <> s.n THEN UPDATE SET t.n = s.n, t.ts = s.ts
     WHEN NOT MATCHED THEN INSERT *
 """)
 
