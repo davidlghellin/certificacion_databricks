@@ -2,3 +2,5 @@
 .direnv
 .DS_Store
 apuntes-databricks
+__pycache__/
+apuntes-databricks/build/.venv-pdf/

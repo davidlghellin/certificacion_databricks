@@ -1,0 +1,178 @@
+{
+  "name": "demo-delta-python",
+  "description": "Recorre los notebooks Python de Delta en orden y comprueba que todos corren",
+  "max_concurrent_runs": 1,
+  "timeout_seconds": 7200,
+  "queue": {
+    "enabled": true
+  },
+  "tags": {
+    "proyecto": "certificacion",
+    "tema": "delta",
+    "lenguaje": "python"
+  },
+  "parameters": [
+    {
+      "name": "limpiar_al_final",
+      "default": "no"
+    }
+  ],
+  "tasks": [
+    {
+      "task_key": "crear_tablas",
+      "description": "saveAsTable vs save, DESCRIBE DETAIL, el transaction log y los checkpoints",
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/00_crear_tablas",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "dml_merge",
+      "description": "DeltaTable.update/delete/merge, deduplicacion, idempotencia",
+      "depends_on": [
+        {
+          "task_key": "crear_tablas"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/01_dml_merge",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "time_travel",
+      "description": "history(), versionAsOf, restoreToVersion",
+      "depends_on": [
+        {
+          "task_key": "crear_tablas"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/02_historial_time_travel",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "esquema",
+      "description": "mergeSchema, overwriteSchema, column mapping",
+      "depends_on": [
+        {
+          "task_key": "crear_tablas"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/03_esquema",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "constraints",
+      "description": "NOT NULL, CHECK, generated columns, identity, PK/FK",
+      "depends_on": [
+        {
+          "task_key": "crear_tablas"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/04_constraints_columnas",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "mantenimiento",
+      "description": "optimize(), executeZOrderBy, liquid clustering, vacuum()",
+      "depends_on": [
+        {
+          "task_key": "dml_merge"
+        },
+        {
+          "task_key": "time_travel"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/05_optimize_vacuum",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "cdf",
+      "description": "readChangeFeed y propagacion a silver con MERGE",
+      "depends_on": [
+        {
+          "task_key": "dml_merge"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/06_change_data_feed",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "clones",
+      "description": "SHALLOW y DEEP clone",
+      "depends_on": [
+        {
+          "task_key": "dml_merge"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/07_clones",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "propiedades",
+      "description": "TBLPROPERTIES, protocolo, concurrencia y reintentos",
+      "depends_on": [
+        {
+          "task_key": "esquema"
+        },
+        {
+          "task_key": "constraints"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/08_propiedades_concurrencia",
+        "source": "WORKSPACE"
+      }
+    },
+    {
+      "task_key": "todo_ok",
+      "description": "Solo llega aqui si ningun notebook ha fallado",
+      "depends_on": [
+        {
+          "task_key": "mantenimiento"
+        },
+        {
+          "task_key": "cdf"
+        },
+        {
+          "task_key": "clones"
+        },
+        {
+          "task_key": "propiedades"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "condition_task": {
+        "op": "EQUAL_TO",
+        "left": "{{job.parameters.limpiar_al_final}}",
+        "right": "si"
+      }
+    },
+    {
+      "task_key": "limpiar",
+      "description": "Borra el esquema demo_delta_py. Solo si limpiar_al_final = si",
+      "depends_on": [
+        {
+          "task_key": "todo_ok",
+          "outcome": "true"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/demo_delta/python/99_limpiar",
+        "source": "WORKSPACE"
+      }
+    }
+  ]
+}

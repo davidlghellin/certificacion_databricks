@@ -1,0 +1,90 @@
+# Los dos pipelines. Mismo temario, uno en SQL y otro en Python, con esquemas
+# destino distintos para que puedan convivir.
+#
+# Claves de un pipeline que hay que conocer:
+#
+#   catalog + schema     dónde publica las tablas (Unity Catalog)
+#   libraries            los ficheros fuente. El bundle los sube solos
+#   configuration        parámetros: ${x} en SQL, spark.conf.get("x") en Python
+#   serverless           sin definir clusters
+#   continuous           false = triggered (arranca, procesa, para)
+#                        true  = continuous (siempre vivo, latencia baja, más caro)
+#   development          true  = el compute no se apaga entre ejecuciones,
+#                                y NO reintenta al fallar (para depurar rápido)
+#                        false = producción: reintentos y compute efímero
+#   photon               motor vectorizado
+#   channel              CURRENT (estable) o PREVIEW (runtime nuevo)
+
+resources:
+  pipelines:
+    # -----------------------------------------------------------------------
+    demo_pipeline_sql:
+      name: demo-pipeline-sql-${bundle.target}
+      catalog: ${var.catalogo}
+      schema: ${var.esquema_sql}
+      # Serverless es OBLIGATORIO en este workspace. NO declares `clusters:` con
+      # compute clásico: el deploy lo rechaza con
+      #   INVALID_PARAMETER_VALUE: You must use serverless compute in this workspace
+      serverless: true
+      # Ojo con la cuota: si hay otro workload serverless vivo, el update muere con
+      #   RESOURCE_EXHAUSTED: You've hit the limit for serverless compute
+      # Por eso el job encadena las tasks en serie en vez de paralelizarlas.
+      continuous: false
+      # `development` NO se pone aquí a propósito: lo gobierna el target.
+      #   dev -> mode: development lo pondría a true, pero el preset
+      #          `pipelines_development: false` lo baja (ver databricks.yml)
+      #   pro -> mode: production lo pone a false
+      # Un valor explícito en este fichero GANARÍA sobre las dos cosas, y es
+      # justo el error que hace que "el preset no funcione".
+      channel: CURRENT
+      photon: true
+
+      libraries:
+        - file:
+            path: ../src/sql/00_bronze.sql
+        - file:
+            path: ../src/sql/01_silver_expectations.sql
+        - file:
+            path: ../src/sql/02_gold.sql
+        - file:
+            path: ../src/sql/03_auto_cdc.sql
+
+      configuration:
+        # Se lee como ${ruta.landing} dentro del SQL
+        ruta.landing: /Volumes/${var.catalogo}/${var.esquema_landing}/landing
+
+    # -----------------------------------------------------------------------
+    demo_pipeline_python:
+      name: demo-pipeline-python-${bundle.target}
+      catalog: ${var.catalogo}
+      schema: ${var.esquema_python}
+      # Serverless es OBLIGATORIO en este workspace. NO declares `clusters:` con
+      # compute clásico: el deploy lo rechaza con
+      #   INVALID_PARAMETER_VALUE: You must use serverless compute in this workspace
+      serverless: true
+      # Ojo con la cuota: si hay otro workload serverless vivo, el update muere con
+      #   RESOURCE_EXHAUSTED: You've hit the limit for serverless compute
+      # Por eso el job encadena las tasks en serie en vez de paralelizarlas.
+      continuous: false
+      # `development` NO se pone aquí a propósito: lo gobierna el target.
+      #   dev -> mode: development lo pondría a true, pero el preset
+      #          `pipelines_development: false` lo baja (ver databricks.yml)
+      #   pro -> mode: production lo pone a false
+      # Un valor explícito en este fichero GANARÍA sobre las dos cosas, y es
+      # justo el error que hace que "el preset no funcione".
+      channel: CURRENT
+      photon: true
+
+      libraries:
+        - file:
+            path: ../src/python/00_bronze.py
+        - file:
+            path: ../src/python/01_silver_expectations.py
+        - file:
+            path: ../src/python/02_gold.py
+        - file:
+            path: ../src/python/03_auto_cdc.py
+
+      configuration:
+        # Se lee con spark.conf.get("ruta.landing") dentro del Python
+        ruta.landing: /Volumes/${var.catalogo}/${var.esquema_landing}/landing

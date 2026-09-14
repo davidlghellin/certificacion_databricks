@@ -1,0 +1,57 @@
+# Raiz de un Databricks Asset Bundle (DAB).
+#
+# Un bundle es "infraestructura como codigo" para Databricks: el job, los
+# notebooks y la configuracion por entorno viajan juntos en el repo y se
+# despliegan con `databricks bundle deploy`.
+
+bundle:
+  name: demo_yml
+
+# Todo lo que defina recursos (jobs, pipelines, schemas...) vive aparte.
+include:
+  - resources/*.yml
+
+# Variables del bundle: se referencian como ${var.nombre} y se pueden
+# sobreescribir por target, por CLI (--var) o por entorno (BUNDLE_VAR_nombre).
+variables:
+  catalogo:
+    description: Catalogo de Unity Catalog donde escribir
+    default: main
+  esquema:
+    description: Esquema destino
+    default: demo_yml
+  items:
+    description: Lista para el for_each, separada por comas
+    default: alfa,beta,gamma
+  notificar_a:
+    description: Email para las alertas del job
+    default: tu-email@ejemplo.com
+
+# Un target = un entorno. `mode: development` hace tres cosas utiles:
+#   - prefija el nombre del job con [dev tu_usuario] para no pisar a nadie
+#   - pone los schedules y triggers en PAUSED
+#   - marca max_concurrent_runs y despliega en tu carpeta personal
+targets:
+  dev:
+    mode: development
+    default: true
+    # Sin `workspace.host`: el CLI lo toma de ~/.databrickscfg o de
+    # DATABRICKS_HOST. Un placeholder aquí rompe `bundle validate`, porque el
+    # CLI intenta autenticarse contra esa URL literal.
+    variables:
+      esquema: demo_yml_dev
+
+  pro:
+    mode: production
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      esquema: demo_yml
+      items: alfa,beta,gamma,delta,epsilon
+    # En produccion el owner del job se fija explicitamente.
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+    presets:
+      # Anula el pausado que trae development; en pro el cron corre.
+      trigger_pause_status: UNPAUSED
